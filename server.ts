@@ -235,7 +235,21 @@ async function fetchSurveys(requestingUser?: { organizationId?: string; role: st
     return [];
   }
 
-  return data ?? serverSurveys;
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    organizationId: row.organization_id,
+    eventId: row.event_id,
+    title: row.title,
+    description: row.description || "",
+    status: row.status,
+    questions: Array.isArray(row.questions) ? row.questions : [],
+    responsesCount: row.responses_count ?? 0,
+    completionRate: row.completion_rate ?? 0,
+    averageTimeMinutes: row.average_time_minutes ?? 0,
+    publicId: row.public_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 }
 
 async function fetchTeams(): Promise<any[]> {
@@ -1020,7 +1034,7 @@ app.post("/api/auth/logout", (req, res) => {
 });
 
 // AUTH API: Forgot Password
-app.post("/api/auth/forgot-password", authRateLimit, (req, res) => {
+app.post("/api/auth/forgot-password", authRateLimit, async (req, res) => {
   const { email } = req.body;
   if (!email || typeof email !== "string") {
     return res
@@ -1028,84 +1042,27 @@ app.post("/api/auth/forgot-password", authRateLimit, (req, res) => {
       .json({ error: "Please provide a valid email address." });
   }
 
-  const user = serverUsers.find(
-    (u) => u.email.toLowerCase() === email.toLowerCase(),
-  );
-
-  // Generate secure reset token
-  const token = crypto.randomInt(10000000, 99999999).toString();
-  resetTokens[token] = {
-    email,
-    token,
-    expiresAt: Date.now() + 3600000, // 1 hour validity
-  };
+  if (supabaseAuth) {
+    const redirectTo = `${process.env.APP_URL || "http://localhost:3000"}/login`;
+    const { error } = await supabaseAuth.auth.resetPasswordForEmail(
+      email.toLowerCase(),
+      { redirectTo },
+    );
+    if (error) {
+      console.warn("Supabase password reset email failed:", error.message);
+    }
+  }
 
   return res.json({
     success: true,
     message: "If an account associated with that email exists, reset instructions have been dispatched.",
-    ...(process.env.NODE_ENV !== "production" ? { resetCode: token } : {}),
   });
 });
 
 // AUTH API: Reset Password
-app.post("/api/auth/reset-password", authRateLimit, async (req, res) => {
-  const { email, code, newPassword } = req.body;
-  if (!email || !code || typeof newPassword !== "string" || newPassword.length < 8) {
-    return res
-      .status(400)
-      .json({ error: "Email, reset code, and new password are required." });
-  }
-
-  const record = resetTokens[code];
-  if (
-    !record ||
-    record.email.toLowerCase() !== email.toLowerCase() ||
-    record.expiresAt < Date.now()
-  ) {
-    return res
-      .status(400)
-      .json({ error: "Invalid or expired password reset verification code." });
-  }
-
-  if (supabase) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", email.toLowerCase())
-      .maybeSingle();
-
-    if (!profile) {
-      delete resetTokens[code];
-      return res.status(400).json({ error: "Invalid or expired password reset verification code." });
-    }
-
-    const { error: updateError } = await supabase.auth.admin.updateUserById(
-      profile.id,
-      { password: newPassword },
-    );
-    if (updateError) {
-      console.warn("Supabase password reset failed:", updateError.message);
-      return res.status(500).json({ error: "Unable to reset password." });
-    }
-  } else {
-    const fallbackUser = serverUsers.find(
-      (user) => user.email.toLowerCase() === email.toLowerCase(),
-    );
-    if (fallbackUser) {
-      fallbackUser.passwordHash = crypto
-        .createHash("sha256")
-        .update(newPassword)
-        .digest("hex");
-    }
-  }
-
-  // Clear used code only after the password update succeeds.
-  delete resetTokens[code];
-
-  return res.json({
-    success: true,
-    message:
-      "Your password has been successfully updated. Please sign in with your new password.",
+app.post("/api/auth/reset-password", authRateLimit, (_req, res) => {
+  return res.status(410).json({
+    error: "Password reset links are handled securely by Supabase Auth.",
   });
 });
 
@@ -1369,7 +1326,7 @@ app.post(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     try {
       const { eventId, ballots, teams, speakers } = req.body;
 
@@ -1710,30 +1667,28 @@ app.post(
       return res.status(400).json({ error: "Survey title is required." });
     }
 
-    const newSurvey = {
-      id: `srv-${Date.now()}`,
-      organizationId: organizationId || "org-ku-debate",
-      eventId: eventId || undefined,
-      title,
-      description: description || "",
-      status: status || "Published",
-      responsesCount: 0,
-      completionRate: 0,
-      averageTimeMinutes: 0,
-      publicId:
-        publicId ||
-        title
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)+/g, "") ||
-        `survey-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      questions: Array.isArray(questions) ? questions : [],
-    };
-
-    serverSurveys.unshift(newSurvey);
-    return res.json({ success: true, survey: newSurvey });
+    if (!supabase) return res.status(503).json({ error: "Survey database is unavailable." });
+    const scopedOrganizationId = (req as any).user.organizationId;
+    const generatedPublicId =
+      publicId ||
+      title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "") ||
+      `survey-${Date.now()}`;
+    const { data: row, error } = await supabase
+      .from("surveys")
+      .insert({
+        organization_id: scopedOrganizationId,
+        event_id: eventId || null,
+        title,
+        description: description || "",
+        status: status || "Published",
+        questions: Array.isArray(questions) ? questions : [],
+        public_id: generatedPublicId,
+      })
+      .select("*")
+      .single();
+    if (error || !row) return res.status(400).json({ error: error?.message || "Unable to create survey." });
+    const survey = (await fetchSurveys((req as any).user)).find((item) => item.id === row.id);
+    return res.json({ success: true, survey });
   },
 );
 
@@ -1748,24 +1703,28 @@ app.put(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const { id } = req.params;
-    const index = serverSurveys.findIndex(
-      (s) => s.id === id || s.publicId === id,
-    );
-    if (index === -1) {
-      return res.status(404).json({ error: "Survey record not found." });
-    }
-
-    const existing = serverSurveys[index];
-    const updatedSurvey = {
-      ...existing,
-      ...req.body,
-      updatedAt: new Date().toISOString(),
-    };
-
-    serverSurveys[index] = updatedSurvey;
-    return res.json({ success: true, survey: updatedSurvey });
+    if (!supabase) return res.status(503).json({ error: "Survey database is unavailable." });
+    const existing = (await fetchSurveys((req as any).user)).find((survey) => survey.id === id || survey.publicId === id);
+    if (!existing) return res.status(404).json({ error: "Survey record not found." });
+    const { data: row, error } = await supabase
+      .from("surveys")
+      .update({
+        title: req.body.title,
+        description: req.body.description,
+        status: req.body.status,
+        questions: req.body.questions,
+        event_id: req.body.eventId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .eq("organization_id", (req as any).user.organizationId)
+      .select("*")
+      .single();
+    if (error || !row) return res.status(400).json({ error: error?.message || "Unable to update survey." });
+    const survey = (await fetchSurveys((req as any).user)).find((item) => item.id === row.id);
+    return res.json({ success: true, survey });
   },
 );
 
@@ -1780,27 +1739,21 @@ app.delete(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const { id } = req.params;
-    const initialCount = serverSurveys.length;
-    serverSurveys = serverSurveys.filter(
-      (s) => s.id !== id && s.publicId !== id,
-    );
-
-    if (serverSurveys.length === initialCount) {
-      return res.status(404).json({ error: "Survey record not found." });
-    }
-
+    if (!supabase) return res.status(503).json({ error: "Survey database is unavailable." });
+    const existing = (await fetchSurveys((req as any).user)).find((survey) => survey.id === id || survey.publicId === id);
+    if (!existing) return res.status(404).json({ error: "Survey record not found." });
+    const { error } = await supabase.from("surveys").delete().eq("id", existing.id).eq("organization_id", (req as any).user.organizationId);
+    if (error) return res.status(400).json({ error: error.message });
     return res.json({ success: true, message: "Survey deleted successfully." });
   },
 );
 
 // GET /api/surveys/:surveyId/questions - Fetch questions for a specific survey
-app.get("/api/surveys/:surveyId/questions", requireApiAuth, (req, res) => {
+app.get("/api/surveys/:surveyId/questions", requireApiAuth, async (req, res) => {
   const { surveyId } = req.params;
-  const survey = serverSurveys.find(
-    (s) => s.id === surveyId || s.publicId === surveyId,
-  );
+  const survey = (await fetchSurveys((req as any).user)).find((s) => s.id === surveyId || s.publicId === surveyId);
   if (!survey) {
     return res.status(404).json({ error: "Survey record not found." });
   }
@@ -1818,11 +1771,9 @@ app.post(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const { surveyId } = req.params;
-    const survey = serverSurveys.find(
-      (s) => s.id === surveyId || s.publicId === surveyId,
-    );
+    const survey = (await fetchSurveys((req as any).user)).find((s) => s.id === surveyId || s.publicId === surveyId);
     if (!survey) {
       return res.status(404).json({ error: "Survey record not found." });
     }
@@ -1855,17 +1806,15 @@ app.post(
       conditionalLogic,
     };
 
-    if (!Array.isArray(survey.questions)) {
-      survey.questions = [];
-    }
-    survey.questions.push(newQuestion);
-    survey.updatedAt = new Date().toISOString();
+    const questions = [...(survey.questions || []), newQuestion];
+    const { data: row, error } = await supabase!.from("surveys").update({ questions, updated_at: new Date().toISOString() }).eq("id", survey.id).eq("organization_id", (req as any).user.organizationId).select("*").single();
+    if (error || !row) return res.status(400).json({ error: error?.message || "Unable to save question." });
 
     return res.json({
       success: true,
       question: newQuestion,
-      questions: survey.questions,
-      survey,
+      questions,
+      survey: (await fetchSurveys((req as any).user)).find((item) => item.id === survey.id),
     });
   },
 );
@@ -1881,37 +1830,32 @@ app.put(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const { surveyId, questionId } = req.params;
-    const survey = serverSurveys.find(
-      (s) => s.id === surveyId || s.publicId === surveyId,
-    );
+    const survey = (await fetchSurveys((req as any).user)).find((s) => s.id === surveyId || s.publicId === surveyId);
     if (!survey) {
       return res.status(404).json({ error: "Survey record not found." });
     }
 
-    if (!Array.isArray(survey.questions)) {
-      survey.questions = [];
-    }
-
-    const qIndex = survey.questions.findIndex((q: any) => q.id === questionId);
+    const questions = [...(survey.questions || [])];
+    const qIndex = questions.findIndex((q: any) => q.id === questionId);
     if (qIndex === -1) {
       return res.status(404).json({ error: "Question not found in survey." });
     }
 
     const updatedQuestion = {
-      ...survey.questions[qIndex],
+      ...questions[qIndex],
       ...req.body,
     };
-
-    survey.questions[qIndex] = updatedQuestion;
-    survey.updatedAt = new Date().toISOString();
+    questions[qIndex] = updatedQuestion;
+    const { error } = await supabase!.from("surveys").update({ questions, updated_at: new Date().toISOString() }).eq("id", survey.id).eq("organization_id", (req as any).user.organizationId);
+    if (error) return res.status(400).json({ error: error.message });
 
     return res.json({
       success: true,
       question: updatedQuestion,
-      questions: survey.questions,
-      survey,
+      questions,
+      survey: (await fetchSurveys((req as any).user)).find((item) => item.id === survey.id),
     });
   },
 );
@@ -1927,28 +1871,22 @@ app.delete(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const { surveyId, questionId } = req.params;
-    const survey = serverSurveys.find(
-      (s) => s.id === surveyId || s.publicId === surveyId,
-    );
+    const survey = (await fetchSurveys((req as any).user)).find((s) => s.id === surveyId || s.publicId === surveyId);
     if (!survey) {
       return res.status(404).json({ error: "Survey record not found." });
     }
 
-    if (!Array.isArray(survey.questions)) {
-      survey.questions = [];
-    }
+    const questions = (survey.questions || []).filter((q: any) => q.id !== questionId);
 
-    const initialLen = survey.questions.length;
-    survey.questions = survey.questions.filter((q: any) => q.id !== questionId);
-
-    if (survey.questions.length === initialLen) {
+    if (questions.length === (survey.questions || []).length) {
       return res.status(404).json({ error: "Question not found in survey." });
     }
 
-    survey.updatedAt = new Date().toISOString();
-    return res.json({ success: true, questions: survey.questions, survey });
+    const { error } = await supabase!.from("surveys").update({ questions, updated_at: new Date().toISOString() }).eq("id", survey.id).eq("organization_id", (req as any).user.organizationId);
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ success: true, questions, survey: (await fetchSurveys((req as any).user)).find((item) => item.id === survey.id) });
   },
 );
 
@@ -1963,12 +1901,10 @@ app.put(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const { surveyId } = req.params;
     const { questions } = req.body;
-    const survey = serverSurveys.find(
-      (s) => s.id === surveyId || s.publicId === surveyId,
-    );
+    const survey = (await fetchSurveys((req as any).user)).find((s) => s.id === surveyId || s.publicId === surveyId);
     if (!survey) {
       return res.status(404).json({ error: "Survey record not found." });
     }
@@ -1979,10 +1915,9 @@ app.put(
         .json({ error: "Questions parameter must be an array." });
     }
 
-    survey.questions = questions;
-    survey.updatedAt = new Date().toISOString();
-
-    return res.json({ success: true, questions: survey.questions, survey });
+    const { error } = await supabase!.from("surveys").update({ questions, updated_at: new Date().toISOString() }).eq("id", survey.id).eq("organization_id", (req as any).user.organizationId);
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json({ success: true, questions, survey: (await fetchSurveys((req as any).user)).find((item) => item.id === survey.id) });
   },
 );
 

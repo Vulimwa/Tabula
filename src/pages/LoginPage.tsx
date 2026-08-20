@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Lock,
@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { tabulaStore } from "../lib/store";
+import { supabase } from "../lib/supabase";
 
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
@@ -23,11 +24,31 @@ export const LoginPage: React.FC = () => {
   const [resetCodeInput, setResetCodeInput] = useState("");
   const [newPasswordInput, setNewPasswordInput] = useState("");
   const [generatedCode, setGeneratedCode] = useState("");
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
 
   // Status feedback
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const accessToken = hash.get("access_token");
+    const refreshToken = hash.get("refresh_token");
+    if (!accessToken || !refreshToken || !supabase) return;
+
+    void supabase.auth
+      .setSession({ access_token: accessToken, refresh_token: refreshToken })
+      .then(({ error }) => {
+        if (error) {
+          setErrorMsg("This password reset link is invalid or expired.");
+          return;
+        }
+        setHasRecoverySession(true);
+        setMode("reset");
+        window.history.replaceState({}, document.title, "/login");
+      });
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,11 +100,7 @@ export const LoginPage: React.FC = () => {
       }
 
       setSuccessMsg(data.message);
-      if (data.resetCode) {
-        setGeneratedCode(data.resetCode);
-        setResetCodeInput(data.resetCode);
-      }
-      setMode("reset");
+      setMode("login");
     } catch (err: any) {
       setErrorMsg(
         err.message || "An error occurred during password reset request.",
@@ -100,19 +117,11 @@ export const LoginPage: React.FC = () => {
     setSuccessMsg("");
 
     try {
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          code: resetCodeInput,
-          newPassword: newPasswordInput,
-        }),
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || "Password reset verification failed.");
+      if (hasRecoverySession && supabase) {
+        const { error } = await supabase.auth.updateUser({ password: newPasswordInput });
+        if (error) throw new Error(error.message);
+      } else {
+        throw new Error("Open the password reset email before choosing a new password.");
       }
 
       setSuccessMsg(
