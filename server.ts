@@ -1656,7 +1656,7 @@ app.post(
       "Organizer",
     ]);
   },
-  (req, res) => {
+  async (req, res) => {
     const {
       title,
       description,
