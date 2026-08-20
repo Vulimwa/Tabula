@@ -496,6 +496,11 @@ app.get("/api/health", (_req, res) => {
   res.json({
     status: "ok",
     service: "TABULA Engine",
+    supabase: {
+      urlConfigured: Boolean(supabaseUrl),
+      anonKeyConfigured: Boolean(supabaseAnonKey),
+      serviceKeyConfigured: Boolean(supabaseServiceKey),
+    },
     timestamp: new Date().toISOString(),
   });
 });
@@ -560,47 +565,52 @@ function getBearerToken(req: any): string | null {
 }
 
 async function requireApiAuth(req: any, res: any, next: any): Promise<void> {
-  const token = getBearerToken(req);
-  if (!token) {
-    return res
-      .status(401)
-      .json({ error: "Authentication required for this API operation." });
-  }
+  try {
+    const token = getBearerToken(req);
+    if (!token) {
+      return res
+        .status(401)
+        .json({ error: "Authentication required for this API operation." });
+    }
 
-  if (supabaseAuth && supabase) {
-    const { data: authData, error: authError } =
-      await supabaseAuth.auth.getUser(token);
+    if (supabaseAuth && supabase) {
+      const { data: authData, error: authError } =
+        await supabaseAuth.auth.getUser(token);
 
-    if (authError || !authData.user) {
+      if (authError || !authData.user) {
+        return res.status(401).json({ error: "Session expired or invalid." });
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("id, email, role, organization_id")
+        .eq("id", authData.user.id)
+        .maybeSingle();
+
+      if (!profile) {
+        return res.status(401).json({ error: "Session profile unavailable." });
+      }
+
+      req.user = {
+        id: profile.id,
+        email: profile.email,
+        role: profile.role,
+        organizationId: profile.organization_id,
+      };
+      return next();
+    }
+
+    const session = activeSessions.get(token);
+    if (!session || session.expiresAt < Date.now()) {
       return res.status(401).json({ error: "Session expired or invalid." });
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id, email, role, organization_id")
-      .eq("id", authData.user.id)
-      .maybeSingle();
-
-    if (!profile) {
-      return res.status(401).json({ error: "Session profile unavailable." });
-    }
-
-    req.user = {
-      id: profile.id,
-      email: profile.email,
-      role: profile.role,
-      organizationId: profile.organization_id,
-    };
+    req.user = { id: session.userId, email: session.email, role: session.role };
     return next();
+  } catch (error) {
+    console.error("API authentication error:", error);
+    return res.status(503).json({ error: "Authentication service is unavailable." });
   }
-
-  const session = activeSessions.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    return res.status(401).json({ error: "Session expired or invalid." });
-  }
-
-  req.user = { id: session.userId, email: session.email, role: session.role };
-  return next();
 }
 
 function requireRoleAccess(
