@@ -62,7 +62,13 @@ export const LoginPage: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error("The authentication service is unavailable. Check the Vercel server configuration.");
+      }
 
       if (!res.ok || !data.success) {
         throw new Error(data.error || "Authentication failed.");
@@ -91,7 +97,13 @@ export const LoginPage: React.FC = () => {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
-      const data = await res.json();
+      const responseText = await res.text();
+      let data: any;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        throw new Error("The password recovery service is unavailable.");
+      }
 
       if (!res.ok || !data.success) {
         throw new Error(

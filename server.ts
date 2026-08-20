@@ -63,13 +63,16 @@ const supabaseAuth =
       })
     : null;
 
-if (
-  process.env.NODE_ENV === "production" &&
-  (!supabase || !supabaseAuth)
-) {
-  throw new Error(
-    "Production requires SUPABASE_SERVICE_ROLE_KEY and Supabase anon configuration.",
-  );
+const productionConfigurationError =
+  process.env.NODE_ENV === "production" && (!supabase || !supabaseAuth)
+    ? "Supabase server configuration is incomplete. Set SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL, and SUPABASE_ANON_KEY in Vercel."
+    : null;
+
+if (productionConfigurationError) {
+  app.use("/api", (req, res, next) => {
+    if (req.path === "/health") return next();
+    return res.status(503).json({ error: productionConfigurationError });
+  });
 }
 
 async function fetchOrganizations(requestingUser?: { organizationId?: string; role: string }): Promise<any[]> {

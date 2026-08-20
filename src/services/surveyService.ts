@@ -9,6 +9,19 @@ const authHeaders = (): Record<string, string> => {
   };
 };
 
+async function readJsonResponse(response: Response): Promise<any> {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(
+      response.ok
+        ? "The survey service returned an invalid response."
+        : "The survey service is unavailable. Check the server deployment configuration.",
+    );
+  }
+}
+
 export const surveyService = {
   // Fetch all surveys from the backend API
   async getAllSurveys(): Promise<Survey[]> {
@@ -16,7 +29,7 @@ export const surveyService = {
       const res = await fetch("/api/surveys", {
         headers: authHeaders(),
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res);
       if (data.success && Array.isArray(data.surveys)) {
         return data.surveys;
       }
@@ -32,7 +45,7 @@ export const surveyService = {
       const res = await fetch(`/api/surveys/${encodeURIComponent(id)}`, {
         headers: authHeaders(),
       });
-      const data = await res.json();
+      const data = await readJsonResponse(res);
       if (data.success && data.survey) {
         return data.survey;
       }
