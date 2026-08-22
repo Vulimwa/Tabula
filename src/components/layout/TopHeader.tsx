@@ -8,19 +8,15 @@ import {
   Settings,
   ChevronDown,
   Check,
-  Sun,
-  Moon,
 } from "lucide-react";
 import { tabulaStore } from "../../lib/store";
 import { USER_ROLES } from "../../lib/rbac";
 import { UserRole } from "../../types";
-import { useTheme } from "../../lib/theme";
 
 export const TopHeader: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const user = tabulaStore.getCurrentUser();
-  const { theme, toggleTheme } = useTheme();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -88,19 +84,6 @@ export const TopHeader: React.FC = () => {
             className="w-full bg-[#181818] text-xs text-white pl-8 pr-3 py-1.5 rounded-none border border-white/10 focus:border-[#E2FF00] focus:outline-none transition-all placeholder:text-[#666]"
           />
         </div>
-
-        {/* Theme Toggle Button */}
-        <button
-          onClick={toggleTheme}
-          className="p-1.5 text-[#A0A0A0] hover:text-white hover:bg-[#181818] rounded transition-colors relative"
-          title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
-        >
-          {theme === "dark" ? (
-            <Sun className="w-4 h-4 text-[#E2FF00]" />
-          ) : (
-            <Moon className="w-4 h-4 text-[#2563EB]" />
-          )}
-        </button>
 
         {/* Notifications */}
         <div className="relative">

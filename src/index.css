@@ -2,32 +2,6 @@
 
 @layer base {
   :root {
-    --bg-page: #0A0A0A;
-    --bg-surface: #141414;
-    --bg-sidebar: #0D0D0D;
-    --bg-sidebar-active: #181818;
-    --bg-sidebar-hover: #141414;
-    --text-primary: #FFFFFF;
-    --text-secondary: #A0A0A0;
-    --text-muted: #888888;
-    --text-on-dark: #FFFFFF;
-    --border-subtle: rgba(255, 255, 255, 0.12);
-    --border-card: rgba(255, 255, 255, 0.10);
-    --brand-primary: #E2FF00;
-    --brand-primary-hover: #CBE600;
-    --brand-primary-text: #000000;
-    --brand-secondary: #3F6FD9;
-    --brand-secondary-hover: #325CBA;
-    --status-success: #E2FF00;
-    --status-warning: #FFB800;
-    --status-danger: #FF4D4D;
-    --status-info: #3F6FD9;
-    --table-header-bg: #1A1A1A;
-    --table-row-hover: #1A1A1A;
-    --input-bg: #181818;
-  }
-
-  html.light-mode {
     --bg-page: #FFFFFF;
     --bg-surface: #FFFFFF;
     --bg-sidebar: #FFFFFF;
@@ -73,37 +47,36 @@
 .text-main-theme { color: var(--text-primary); }
 .text-secondary-theme { color: var(--text-secondary); }
 
-/* Existing screens use a small set of hardcoded dark utility colors. Keep
-  those screens theme-aware without requiring every page to duplicate theme
-  conditionals. */
-html.light-mode [class*="bg-[#0A0A0A]"] { background-color: var(--bg-page) !important; }
-html.light-mode [class*="bg-[#0D0D0D]"] { background-color: var(--bg-surface) !important; }
-html.light-mode [class*="bg-[#141414]"] { background-color: var(--bg-surface) !important; }
-html.light-mode [class*="bg-[#181818]"],
-html.light-mode [class*="bg-[#1C1C1C]"],
-html.light-mode [class*="bg-[#1A1A1A]"] { background-color: var(--input-bg) !important; }
-html.light-mode [class*="bg-[#252525]"],
-html.light-mode [class*="bg-[#1F1F1F]"] { background-color: var(--table-row-hover) !important; }
-html.light-mode [class*="text-white"] { color: var(--text-primary) !important; }
-html.light-mode [class*="text-[#A0A0A0]"] { color: var(--text-secondary) !important; }
-html.light-mode [class*="text-[#888"] { color: var(--text-muted) !important; }
-html.light-mode [class*="text-[#E2FF00]"] { color: var(--brand-primary) !important; }
-html.light-mode [class*="bg-[#E2FF00]"] { background-color: var(--brand-primary) !important; }
-html.light-mode [class*="hover:bg-[#CBE600]"]:hover { background-color: var(--brand-primary-hover) !important; }
-html.light-mode [class*="border-[#E2FF00]"] { border-color: var(--brand-primary) !important; }
-html.light-mode [class*="text-[#3F6FD9]"],
-html.light-mode [class*="text-[#2563EB]"],
-html.light-mode [class*="text-blue-"] { color: var(--brand-primary) !important; }
-html.light-mode [class*="bg-[#3F6FD9]"],
-html.light-mode [class*="bg-[#2563EB]"],
-html.light-mode [class*="bg-blue-"] { background-color: var(--brand-primary) !important; }
-html.light-mode [class*="border-blue-"] { border-color: var(--brand-primary) !important; }
-html.light-mode [class*="border-white"] { border-color: var(--border-subtle) !important; }
-html.light-mode [class*="placeholder:text-[#666"]::placeholder { color: var(--text-muted) !important; }
-html.light-mode [class*="hover:bg-[#141414]"]:hover,
-html.light-mode [class*="hover:bg-[#181818]"]:hover,
-html.light-mode [class*="hover:bg-[#1C1C1C]"]:hover,
-html.light-mode [class*="hover:bg-[#1F1F1F]"]:hover { background-color: var(--table-row-hover) !important; }
+/* Existing screens use a small set of dark utility colors. Map them to the
+  single light palette without requiring each screen to duplicate styles. */
+html [class*="bg-[#0A0A0A]"] { background-color: var(--bg-page) !important; }
+html [class*="bg-[#0D0D0D]"] { background-color: var(--bg-surface) !important; }
+html [class*="bg-[#141414]"] { background-color: var(--bg-surface) !important; }
+html [class*="bg-[#181818]"],
+html [class*="bg-[#1C1C1C]"],
+html [class*="bg-[#1A1A1A]"] { background-color: var(--input-bg) !important; }
+html [class*="bg-[#252525]"],
+html [class*="bg-[#1F1F1F]"] { background-color: var(--table-row-hover) !important; }
+html [class*="text-white"] { color: var(--text-primary) !important; }
+html [class*="text-[#A0A0A0]"] { color: var(--text-secondary) !important; }
+html [class*="text-[#888"] { color: var(--text-muted) !important; }
+html [class*="text-[#E2FF00]"] { color: var(--brand-primary) !important; }
+html [class*="bg-[#E2FF00]"] { background-color: var(--brand-primary) !important; }
+html [class*="hover:bg-[#CBE600]"]:hover { background-color: var(--brand-primary-hover) !important; }
+html [class*="border-[#E2FF00]"] { border-color: var(--brand-primary) !important; }
+html [class*="text-[#3F6FD9]"],
+html [class*="text-[#2563EB]"],
+html [class*="text-blue-"] { color: var(--brand-primary) !important; }
+html [class*="bg-[#3F6FD9]"],
+html [class*="bg-[#2563EB]"],
+html [class*="bg-blue-"] { background-color: var(--brand-primary) !important; }
+html [class*="border-blue-"] { border-color: var(--brand-primary) !important; }
+html [class*="border-white"] { border-color: var(--border-subtle) !important; }
+html [class*="placeholder:text-[#666"]::placeholder { color: var(--text-muted) !important; }
+html [class*="hover:bg-[#141414]"]:hover,
+html [class*="hover:bg-[#181818]"]:hover,
+html [class*="hover:bg-[#1C1C1C]"]:hover,
+html [class*="hover:bg-[#1F1F1F]"]:hover { background-color: var(--table-row-hover) !important; }
 
 /* Bold Typography Theme Utility Classes */
 .display-type {

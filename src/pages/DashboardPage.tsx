@@ -54,13 +54,17 @@ export const DashboardPage: React.FC = () => {
         .getRounds(liveEvent.id)
         .find((round) => round.roundNumber === liveEvent.currentRound)
     : undefined;
-  const liveRooms = liveEvent ? tabulaStore.getRooms(liveEvent.id) : [];
+  const liveRooms = liveEvent
+    ? tabulaStore.getRooms(liveEvent.id, liveRound?.id)
+    : [];
   const liveBallots = liveEvent ? tabulaStore.getBallots(liveEvent.id) : [];
 
   const isOrganizer =
     user?.role === "Super Admin" ||
     user?.role === "Organization Admin" ||
     user?.role === "Organizer";
+  const isSuperAdmin = user?.role === "Super Admin";
+  const dashboardPanelCount = Number(isSuperAdmin) + Number(isOrganizer);
 
   return (
     <div className="space-y-6">
@@ -222,10 +226,10 @@ export const DashboardPage: React.FC = () => {
 
       {/* Grid: Live Tabulation & Recent Activity */}
       <div
-        className={`grid grid-cols-1 ${isOrganizer ? "lg:grid-cols-2" : ""} gap-6`}
+        className={`grid grid-cols-1 ${dashboardPanelCount > 1 ? "lg:grid-cols-2" : ""} gap-6`}
       >
-        {/* Live Tabulation Widget */}
-        <div className="bg-[#141414] border border-white/10 p-6 flex flex-col justify-between">
+        {/* Live tabulation is restricted to Super Admin and always reflects live data. */}
+        {isSuperAdmin && <div className="bg-[#141414] border border-white/10 p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-white/10">
               <div className="flex items-center space-x-2.5">
@@ -267,24 +271,44 @@ export const DashboardPage: React.FC = () => {
               </div>
 
               <div className="space-y-2.5 pt-2">
-                <div className="flex justify-between items-center text-[#A0A0A0] text-xs">
-                  <span>Hall A (Science Complex)</span>
-                  <span className="text-[#FFB800] font-mono font-bold">
-                    Awaiting Ballot (Chair: James Otieno)
-                  </span>
-                </div>
-                <div className="flex justify-between items-center text-[#A0A0A0] text-xs">
-                  <span>Hall B (Law Block)</span>
-                  <span className="text-[#E2FF00] font-mono font-bold flex items-center">
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                    Verified & Locked
-                  </span>
-                </div>
+                {liveRooms.length === 0 ? (
+                  <p className="text-[#A0A0A0] text-xs">No rooms are configured for the current live round.</p>
+                ) : (
+                  liveRooms.map((room) => {
+                    const roomBallots = liveBallots.filter(
+                      (ballot) => ballot.debateRoomId === room.id,
+                    );
+                    const lockedBallots = roomBallots.filter(
+                      (ballot) => ballot.isLocked).length;
+                    const isLocked =
+                      room.status === "Complete" ||
+                      lockedBallots >= room.expectedBallots;
+                    const chair = room.assignedJudges.find(
+                      (judge) => judge.experienceLevel === "Chair",
+                    );
+
+                    return (
+                      <div key={room.id} className="flex justify-between items-center text-[#A0A0A0] text-xs gap-4">
+                        <span>{room.roomName}</span>
+                        {isLocked ? (
+                          <span className="text-[#E2FF00] font-mono font-bold flex items-center whitespace-nowrap">
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                            Verified &amp; Locked
+                          </span>
+                        ) : (
+                          <span className="text-[#FFB800] font-mono font-bold text-right">
+                            Awaiting Ballot{chair ? ` (Chair: ${chair.name})` : ""}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </div>
           </div>
 
-          {isOrganizer && (
+          {isSuperAdmin && (
             <div className="mt-6 pt-4 border-t border-white/10 flex justify-end">
               <button
                 onClick={() => navigate("/tabulation/live")}
@@ -294,7 +318,7 @@ export const DashboardPage: React.FC = () => {
               </button>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Recent Activity Log Feed (Organizers only) */}
         {isOrganizer && (

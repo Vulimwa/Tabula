@@ -76,7 +76,7 @@ export const ROUTE_ROLE_ACCESS: Record<string, UserRole[]> = {
     "Participant",
     "Viewer",
   ],
-  "/tabulation/live": ["Super Admin", "Organization Admin", "Organizer"],
+  "/tabulation/live": ["Super Admin"],
   "/tabulation/standings": [
     "Super Admin",
     "Organization Admin",

@@ -27,11 +27,8 @@ import { UsersPage } from "./pages/UsersPage";
 import { RolesPage } from "./pages/RolesPage";
 import { AuditLogsPage } from "./pages/AuditLogsPage";
 import { SettingsPage } from "./pages/SettingsPage";
-import { useTheme } from "./lib/theme";
 
 export function App() {
-  useTheme();
-
   return (
     <ToastProvider>
       <BrowserRouter>

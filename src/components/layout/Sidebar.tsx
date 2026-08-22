@@ -188,7 +188,7 @@ export const Sidebar: React.FC = () => {
           isOpen={openGroups.tabulation}
           onToggle={() => toggleGroup('tabulation')}
         >
-          {isOrganizer && (
+          {isSuperAdmin && (
             <NavLink to="/tabulation/live" className={linkClass}>
               <Radio className="w-3.5 h-3.5" />
               <span>Live Tab</span>
