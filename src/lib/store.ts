@@ -238,6 +238,10 @@ class TabulaStore {
   }
 
   public async loadSurveysFromApi(): Promise<Survey[]> {
+    // Public pages are allowed to render before login. Do not make an
+    // authenticated API request until a session token is available.
+    if (!this.apiToken) return this.surveys;
+
     try {
       const fetched = await surveyService.getAllSurveys();
       if (fetched && fetched.length > 0) {
